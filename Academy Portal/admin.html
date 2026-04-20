@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#050505">
+    <title>Comda Academy - ניהול</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<header style="padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(0,212,255,0.15);">
+    <a href="index.html" class="btn btn-ghost" style="text-decoration:none;">← חזרה לקטלוג</a>
+    <h1 class="academy-title">Admin · ניהול</h1>
+    <button id="btn-logout" class="btn btn-ghost hidden">התנתק</button>
+</header>
+
+<!-- ======== LOGIN SCREEN ======== -->
+<main id="login-screen" class="admin-shell">
+    <form id="login-form" class="login-box" autocomplete="off">
+        <h1>כניסה לניהול</h1>
+
+        <div class="field">
+            <label for="login-username">שם משתמש</label>
+            <input id="login-username" type="text" value="admin" autocomplete="username">
+        </div>
+
+        <div class="field">
+            <label for="login-password">סיסמה</label>
+            <input id="login-password" type="password" autocomplete="current-password">
+            <div class="hint">סיסמת ברירת מחדל: admin123 (שנה אותה מיד מהלשונית "הגדרות")</div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,.08); margin: 24px 0;">
+
+        <h3 style="color:#9ca3af; font-size: .85rem; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px;">חיבור ל-GitHub</h3>
+
+        <div class="field">
+            <label for="cfg-owner">Owner (שם משתמש/ארגון)</label>
+            <input id="cfg-owner" type="text" placeholder="e.g. comsign">
+        </div>
+        <div class="field">
+            <label for="cfg-repo">Repository</label>
+            <input id="cfg-repo" type="text" placeholder="e.g. academy-portal">
+        </div>
+        <div class="field">
+            <label for="cfg-branch">Branch</label>
+            <input id="cfg-branch" type="text" value="main">
+        </div>
+        <div class="field">
+            <label for="cfg-token">Personal Access Token</label>
+            <input id="cfg-token" type="password" autocomplete="new-password" placeholder="github_pat_...">
+            <div class="hint">Fine-grained PAT עם הרשאות Contents: Read & Write על הריפו הזה. נשמר רק בדפדפן המקומי.</div>
+        </div>
+
+        <div id="login-status"></div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 18px;">
+            <button type="button" id="btn-save-cfg" class="btn btn-ghost">שמור הגדרות בלבד</button>
+            <button type="button" id="btn-login" class="btn btn-primary">התחבר</button>
+        </div>
+    </form>
+</main>
+
+<!-- ======== ADMIN DASHBOARD ======== -->
+<main id="admin-screen" class="admin-shell hidden">
+
+    <div id="admin-status" class="hidden"></div>
+    <div id="action-banner" class="status info hidden"></div>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="tab-products">מוצרים</button>
+        <button class="tab"        data-tab="tab-categories">קטגוריות</button>
+        <button class="tab"        data-tab="tab-settings">הגדרות</button>
+    </div>
+
+    <!-- Products -->
+    <section id="tab-products" class="tab-panel">
+        <div class="toolbar">
+            <h2>מוצרים</h2>
+            <button id="btn-add-product" class="btn btn-primary">+ הוסף מוצר</button>
+        </div>
+        <div id="products-list"></div>
+    </section>
+
+    <!-- Categories -->
+    <section id="tab-categories" class="tab-panel hidden">
+        <div class="toolbar">
+            <h2>קטגוריות</h2>
+            <button id="btn-add-category" class="btn btn-primary">+ הוסף קטגוריה</button>
+        </div>
+        <div id="categories-list"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="tab-settings" class="tab-panel hidden">
+        <div class="toolbar"><h2>הגדרות</h2></div>
+
+        <div style="max-width: 520px;">
+            <h3 style="color: var(--neon-blue); font-weight: 400;">שינוי סיסמה</h3>
+            <div class="field">
+                <label for="pw-current">סיסמה נוכחית</label>
+                <input id="pw-current" type="password" autocomplete="current-password">
+            </div>
+            <div class="field">
+                <label for="pw-new">סיסמה חדשה (לפחות 8 תווים)</label>
+                <input id="pw-new" type="password" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label for="pw-new2">אישור סיסמה חדשה</label>
+                <input id="pw-new2" type="password" autocomplete="new-password">
+            </div>
+            <div id="pw-status"></div>
+            <button id="btn-change-password" class="btn btn-primary">עדכן סיסמה</button>
+
+            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,.08); margin: 32px 0;">
+            <h3 style="color: var(--neon-blue); font-weight: 400;">טיפים</h3>
+            <p class="muted" style="font-size: .9rem; line-height: 1.7;">
+                • כל שינוי (הוספה/מחיקה/עדכון של מוצר או קטגוריה) מבוצע כ-commit אוטומטי בריפו.<br>
+                • כשמעלים מצגת, GitHub Actions ממיר אותה ל-WebP. התהליך אורך כדקה עד שתיים.<br>
+                • המוצרים שאין להם עדיין מצגת יופיעו בקטלוג עם התווית "טרם הועלתה מצגת".<br>
+                • לאחר צפייה ראשונה במצגת, היא תישמר במטמון והטאבלט יוכל להציג אותה offline.
+            </p>
+        </div>
+    </section>
+
+</main>
+
+<!-- ======== MODALS ======== -->
+
+<!-- Product modal -->
+<div id="product-modal" class="modal-backdrop">
+    <div class="modal">
+        <h3 id="pm-title">מוצר חדש</h3>
+        <div class="field">
+            <label for="pm-nameHe">שם בעברית</label>
+            <input id="pm-nameHe" type="text">
+        </div>
+        <div class="field">
+            <label for="pm-nameEn">שם באנגלית</label>
+            <input id="pm-nameEn" type="text">
+        </div>
+        <div class="field">
+            <label for="pm-folder">מזהה (folder) – אותיות אנגליות, מספרים, מקפים</label>
+            <input id="pm-folder" type="text" placeholder="e.g. ccms">
+            <div class="hint">לא ניתן לשנות אחרי יצירה.</div>
+        </div>
+        <div class="field">
+            <label for="pm-category">קטגוריה</label>
+            <select id="pm-category"></select>
+        </div>
+        <div id="pm-status"></div>
+        <div class="actions">
+            <button id="product-cancel" class="btn btn-ghost">בטל</button>
+            <button id="product-save" class="btn btn-primary">שמור</button>
+        </div>
+    </div>
+</div>
+
+<!-- Category modal -->
+<div id="category-modal" class="modal-backdrop">
+    <div class="modal">
+        <h3 id="cm-title">קטגוריה חדשה</h3>
+        <div class="field">
+            <label for="cm-key">מפתח (key)</label>
+            <input id="cm-key" type="text" placeholder="e.g. new-cat">
+            <div class="hint">לא ניתן לשנות אחרי יצירה.</div>
+        </div>
+        <div class="field">
+            <label for="cm-he">שם בעברית</label>
+            <input id="cm-he" type="text">
+        </div>
+        <div class="field">
+            <label for="cm-en">שם באנגלית</label>
+            <input id="cm-en" type="text">
+        </div>
+        <div class="field">
+            <label for="cm-order">סדר הצגה</label>
+            <input id="cm-order" type="number" min="1" max="99">
+        </div>
+        <div id="cm-status"></div>
+        <div class="actions">
+            <button id="category-cancel" class="btn btn-ghost">בטל</button>
+            <button id="category-save" class="btn btn-primary">שמור</button>
+        </div>
+    </div>
+</div>
+
+<!-- Upload modal -->
+<div id="upload-modal" class="modal-backdrop">
+    <div class="modal">
+        <h3 id="um-title">העלאת מצגת</h3>
+        <div class="field">
+            <label for="um-lang">שפת המצגת</label>
+            <select id="um-lang">
+                <option value="he">עברית (he)</option>
+                <option value="en">English (en)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="um-file">קובץ PPTX / PPT / PDF</label>
+            <input id="um-file" type="file" accept=".pptx,.ppt,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf">
+            <div class="hint">עד 95MB. השרת ימיר אוטומטית לתמונות WebP.</div>
+        </div>
+        <div id="um-progress-wrap" style="display:none">
+            <div class="hint">מעלה...</div>
+            <div class="progress"><div id="um-progress" class="bar" style="width:0%"></div></div>
+        </div>
+        <div id="um-status"></div>
+        <div class="actions">
+            <button id="upload-cancel" class="btn btn-ghost">בטל</button>
+            <button id="upload-start" class="btn btn-primary">התחל העלאה</button>
+        </div>
+    </div>
+</div>
+
+<script src="assets/js/background.js" defer></script>
+<script src="assets/js/github-api.js" defer></script>
+<script src="assets/js/admin.js" defer></script>
+</body>
+</html>

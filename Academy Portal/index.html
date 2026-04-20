@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#050505">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Comda Academy">
+    <title>Comda Academy - Digital Product Library</title>
+
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Swiper (CDN - for book-like page flip) -->
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<header style="padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(0,212,255,0.15);">
+    <div style="flex:1; display:flex; align-items:center;">
+        <img src="icons/logo.png"
+             alt="Comsign"
+             id="logo"
+             style="height: 48px; cursor: pointer; user-select: none;"
+             title="לחיצה ארוכה לכניסה לניהול"
+             onerror="this.style.display='none'">
+    </div>
+
+    <div style="flex:1; display:flex; justify-content:center;">
+        <img src="icons/academy_title.png"
+             alt="Comda Academy"
+             style="height: 48px; object-fit: contain;"
+             onerror="this.style.display='none'; document.getElementById('academy-text').classList.remove('hidden');">
+        <h1 id="academy-text" class="academy-title hidden">Comda Academy</h1>
+    </div>
+
+    <div style="flex:1; display:flex; justify-content:flex-end;">
+        <button id="lang-btn"
+                class="glass-card"
+                style="padding: 8px 18px; font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; background: transparent; color: white; cursor: pointer; font-family: inherit;">
+            EN
+        </button>
+    </div>
+</header>
+
+<main id="main-content" style="padding: 1.5rem; max-width: 1400px; margin: 0 auto;">
+    <div id="sections-container"></div>
+</main>
+
+<!-- Book viewer (hidden until user opens a presentation) -->
+<div id="book-viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title">
+    <div class="viewer-topbar">
+        <div class="viewer-title" id="viewer-title"></div>
+        <button id="btn-close" class="btn-close" type="button">סגור</button>
+    </div>
+
+    <div class="swiper mySwiper">
+        <div class="swiper-wrapper" id="viewer-wrapper"></div>
+        <div class="swiper-pagination"></div>
+        <div class="swiper-button-next"></div>
+        <div class="swiper-button-prev"></div>
+    </div>
+</div>
+
+<script src="assets/js/background.js" defer></script>
+<script src="assets/js/app.js" defer></script>
+</body>
+</html>
