@@ -1,0 +1,144 @@
+name: Convert uploaded presentations
+
+# Only run on pushes that add/modify files in uploads/.
+# The commit we make at the end only touches data/** so it won't re-trigger the workflow.
+on:
+  push:
+    paths:
+      - 'uploads/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: convert-pptx
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools (LibreOffice, poppler, webp)
+        run: |
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libreoffice-impress poppler-utils webp imagemagick jq
+
+      - name: Find uploaded files
+        id: scan
+        run: |
+          shopt -s nullglob
+          FILES=(uploads/*.pptx uploads/*.ppt uploads/*.pdf)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No files to convert"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "count=${#FILES[@]}" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "${FILES[@]}"
+          fi
+
+      - name: Convert files
+        if: steps.scan.outputs.count != '0'
+        env:
+          TARGET_WIDTH: '1920'
+          TARGET_HEIGHT: '1080'
+          WEBP_QUALITY: '82'
+          DENSITY: '150' # pdftoppm density (dpi)
+        run: |
+          set -euo pipefail
+          mkdir -p data/presentations
+
+          shopt -s nullglob
+          for FILE in uploads/*.pptx uploads/*.ppt uploads/*.pdf; do
+            [ -e "$FILE" ] || continue
+            BASENAME="$(basename "$FILE")"
+            STEM="${BASENAME%.*}"          # e.g. "ccms__he"
+            EXT="${BASENAME##*.}"          # e.g. "pptx" / "pdf"
+
+            # Parse "{folder}__{lang}"
+            if [[ "$STEM" != *"__"* ]]; then
+              echo "::warning::Skipping $FILE (expected {folder}__{lang}.ext)"
+              continue
+            fi
+            FOLDER="${STEM%__*}"
+            LANG="${STEM##*__}"
+
+            if [ "$LANG" != "he" ] && [ "$LANG" != "en" ]; then
+              echo "::warning::Skipping $FILE (language must be he or en, got '$LANG')"
+              continue
+            fi
+
+            echo "::group::Converting $FILE -> $FOLDER/$LANG"
+
+            WORKDIR="$(mktemp -d)"
+
+            # 1) PPT(X) -> PDF (if not already PDF)
+            if [ "${EXT,,}" = "pdf" ]; then
+              cp "$FILE" "$WORKDIR/source.pdf"
+            else
+              # Sanitize the working copy name so LibreOffice produces a predictable PDF name.
+              cp "$FILE" "$WORKDIR/source.${EXT}"
+              libreoffice --headless --convert-to pdf --outdir "$WORKDIR" "$WORKDIR/source.${EXT}"
+              if [ ! -f "$WORKDIR/source.pdf" ]; then
+                echo "::error::LibreOffice did not produce a PDF from $FILE"
+                continue
+              fi
+            fi
+
+            # 2) PDF -> per-page PNG (high DPI, correct aspect)
+            pdftoppm -r "$DENSITY" -png "$WORKDIR/source.pdf" "$WORKDIR/p"
+
+            # 3) PNG -> WebP at TARGET_WIDTHxTARGET_HEIGHT (fit inside, no upscaling distortion)
+            OUT_DIR="data/presentations/$FOLDER/$LANG"
+            rm -rf "$OUT_DIR"
+            mkdir -p "$OUT_DIR"
+
+            PAGE_COUNT=0
+            for PNG in "$WORKDIR"/p-*.png; do
+              [ -e "$PNG" ] || continue
+              PAGE_COUNT=$((PAGE_COUNT + 1))
+
+              # Resize to fit within target, keep aspect ratio, convert to WebP
+              RESIZED="$WORKDIR/r-${PAGE_COUNT}.png"
+              convert "$PNG" -resize "${TARGET_WIDTH}x${TARGET_HEIGHT}>" -strip "$RESIZED"
+              cwebp -q "$WEBP_QUALITY" -quiet "$RESIZED" -o "$OUT_DIR/page-${PAGE_COUNT}.webp"
+            done
+
+            echo "Produced $PAGE_COUNT pages for $FOLDER/$LANG"
+
+            # 4) Update products.json pages count for this product/lang
+            if [ -f data/products.json ]; then
+              tmp="$(mktemp)"
+              jq --arg folder "$FOLDER" --arg lang "$LANG" --argjson n "$PAGE_COUNT" '
+                .updatedAt = (now | todate) |
+                (.products[] | select(.folder == $folder) | .pages[$lang]) |= $n
+              ' data/products.json > "$tmp" && mv "$tmp" data/products.json
+            fi
+
+            # 5) Delete the processed upload
+            rm -f "$FILE"
+            rm -rf "$WORKDIR"
+
+            echo "::endgroup::"
+          done
+
+      - name: Commit results
+        if: steps.scan.outputs.count != '0'
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "auto: converted presentations [skip ci]"
+            # Pull-rebase to tolerate concurrent commits from the admin panel.
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          fi
