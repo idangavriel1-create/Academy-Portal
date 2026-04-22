@@ -12,22 +12,18 @@
 (() => {
   'use strict';
 
-  // ---------- Config ----------
   const DATA_URL = 'data/products.json';
   const PRESENTATIONS_ROOT = 'data/presentations';
-  const PRELOAD_NEIGHBOURS = 2; // pages to preload on each side of current
+  const PRELOAD_NEIGHBOURS = 2;
 
-  // ---------- State ----------
   let data = null;
   let currentLang = (localStorage.getItem('academy.lang')) || 'he';
   let swiper = null;
   let activeProduct = null;
 
-  // ---------- DOM ----------
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-  // ---------- Boot ----------
   document.addEventListener('DOMContentLoaded', boot);
 
   async function boot() {
@@ -36,7 +32,7 @@
     registerServiceWorker();
 
     try {
-      data = await fetchJson(`${DATA_URL}?t=${Date.now()}`); // bust CDN cache, SW handles local caching
+      data = await fetchJson(`${DATA_URL}?t=${Date.now()}`);
     } catch (e) {
       renderError('לא הצלחנו לטעון את קטלוג המוצרים.<br>' + (e.message || ''));
       return;
@@ -46,12 +42,13 @@
     renderLibrary();
   }
 
-  // ---------- Header actions ----------
   function wireHeader() {
     const langBtn = $('#lang-btn');
     if (langBtn) langBtn.addEventListener('click', toggleLang);
 
-    // Keep the admin entry as a hidden long-press on the logo (unchanged UX from original).
+    const refreshBtn = $('#refresh-btn');
+    if (refreshBtn) refreshBtn.addEventListener('click', hardRefresh);
+
     const logo = $('#logo');
     if (logo) {
       let timer = null;
@@ -67,6 +64,24 @@
       logo.addEventListener('touchend',   cancel);
       logo.addEventListener('touchcancel', cancel);
     }
+  }
+
+  async function hardRefresh() {
+    const btn = $('#refresh-btn');
+    if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage('clearAll');
+      }
+      if (self.caches) {
+        const names = await caches.keys();
+        await Promise.all(names.map(n => caches.delete(n)));
+      }
+    } catch (e) {
+      console.warn('cache clear failed:', e);
+    }
+    window.location.reload();
   }
 
   function toggleLang() {
@@ -85,7 +100,6 @@
     if (closeBtn && data) closeBtn.textContent = data.ui.close[lang];
   }
 
-  // ---------- Library rendering ----------
   function renderLibrary() {
     const container = $('#sections-container');
     container.innerHTML = '';
@@ -144,8 +158,7 @@
       img.loading = 'lazy';
       img.decoding = 'async';
       img.alt = '';
-      // First slide used as cover (common convention).
-      img.src = `${PRESENTATIONS_ROOT}/${product.folder}/${currentLang}/page-1.webp`;
+      img.src = imageUrl(product, currentLang, 1);
       img.onerror = () => {
         thumb.innerHTML = `<div class="no-cover">${currentLang === 'he' ? 'אין כריכה' : 'No cover'}</div>`;
       };
@@ -175,11 +188,9 @@
       </div>`;
   }
 
-  // ---------- Viewer ----------
   function wireViewer() {
     $('#btn-close')?.addEventListener('click', closeBook);
 
-    // ESC to close the viewer.
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && $('#book-viewer').classList.contains('open')) closeBook();
     });
@@ -207,7 +218,6 @@
     viewer.classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    // (Re)initialise Swiper.
     if (swiper) { swiper.destroy(true, true); swiper = null; }
     swiper = new Swiper('.mySwiper', {
       effect: 'creative',
@@ -237,7 +247,6 @@
       }
     });
 
-    // Initial load + neighbour preload.
     loadSlideImages(0);
     swiper.on('slideChangeTransitionStart', () => loadSlideImages(swiper.activeIndex));
     swiper.on('slideChange',                () => loadSlideImages(swiper.activeIndex));
@@ -247,15 +256,17 @@
     const slide = document.createElement('div');
     slide.className = 'swiper-slide';
     slide.dataset.page = String(pageNum);
-    slide.dataset.src = `${PRESENTATIONS_ROOT}/${product.folder}/${currentLang}/page-${pageNum}.webp`;
+    slide.dataset.src = imageUrl(product, currentLang, pageNum);
     slide.innerHTML = `<div class="slide-loading">${data.ui.loading[currentLang]}</div>`;
     return slide;
   }
 
-  /**
-   * Make sure slides around `idx` have their <img> injected.
-   * Slides outside the window stay as placeholders. Already-loaded slides are skipped.
-   */
+  function imageUrl(product, lang, pageNum) {
+    const v = product.versions?.[lang];
+    const qs = v ? `?v=${encodeURIComponent(v)}` : '';
+    return `${PRESENTATIONS_ROOT}/${product.folder}/${lang}/page-${pageNum}.webp${qs}`;
+  }
+
   function loadSlideImages(idx) {
     const wrapper = $('#viewer-wrapper');
     const slides = wrapper.children;
@@ -276,16 +287,10 @@
       img.alt = '';
       img.onload = () => {
         slide.innerHTML = '';
-        img.style.opacity = '0';
-        img.style.transition = 'opacity 250ms ease';
         slide.appendChild(img);
-        requestAnimationFrame(() => { img.style.opacity = '1'; });
       };
       img.onerror = () => {
-        slide.innerHTML =
-          `<div class="slide-loading" style="color:#f87171">` +
-          (currentLang === 'he' ? 'שגיאה בטעינת העמוד' : 'Failed to load page') +
-          `</div>`;
+        slide.innerHTML = `<div class="slide-loading">${data.ui.error ? data.ui.error[currentLang] : 'Error'}</div>`;
       };
       img.src = src;
     }
@@ -296,10 +301,10 @@
     viewer.classList.remove('open');
     document.body.style.overflow = '';
     if (swiper) { swiper.destroy(true, true); swiper = null; }
+    $('#viewer-wrapper').innerHTML = '';
     activeProduct = null;
   }
 
-  // ---------- Utils ----------
   async function fetchJson(url) {
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -308,10 +313,10 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    // Register at page load (non-blocking).
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js', { scope: './' })
-        .catch(err => console.warn('SW registration failed:', err));
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('SW registration failed:', err);
+      });
     });
   }
 })();

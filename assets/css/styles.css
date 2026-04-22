@@ -544,6 +544,12 @@ header {
     transition: width 0.3s ease;
 }
 
+/* Refresh button spin */
+#refresh-btn svg { transition: transform 0.2s; }
+#refresh-btn:hover svg { transform: rotate(30deg); }
+#refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Install banner */
 #install-banner {
     position: fixed;
