@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-04-22T20:15:21Z",
+  "updatedAt": "2026-04-22T20:18:51Z",
   "ui": {
     "close": {
       "he": "חזרה לקטלוג",
@@ -49,11 +49,11 @@
       "nameHe": "CCMS",
       "nameEn": "CCMS",
       "pages": {
-        "he": 5,
+        "he": 1,
         "en": 0
       },
       "versions": {
-        "he": "1776888921"
+        "he": "1776889131"
       }
     },
     {
