@@ -110,12 +110,14 @@ jobs:
 
             echo "Produced $PAGE_COUNT pages for $FOLDER/$LANG"
 
-            # 4) Update products.json pages count for this product/lang
+            # 4) Update products.json: pages count + per-language version (for cache-busting)
             if [ -f data/products.json ]; then
+              VERSION="$(date +%s)"
               tmp="$(mktemp)"
-              jq --arg folder "$FOLDER" --arg lang "$LANG" --argjson n "$PAGE_COUNT" '
+              jq --arg folder "$FOLDER" --arg lang "$LANG" --argjson n "$PAGE_COUNT" --arg ver "$VERSION" '
                 .updatedAt = (now | todate) |
-                (.products[] | select(.folder == $folder) | .pages[$lang]) |= $n
+                (.products[] | select(.folder == $folder)) |=
+                  (.pages[$lang] = $n | .versions = ((.versions // {}) | .[$lang] = $ver))
               ' data/products.json > "$tmp" && mv "$tmp" data/products.json
             fi
 
